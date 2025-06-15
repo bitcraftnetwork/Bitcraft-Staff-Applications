@@ -153,7 +153,7 @@ function createSubmissionModal() {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId("discord_minecraft_experience")
-          .setLabel("Experience with Discord & Minecraft moderation?")
+          .setLabel("Discord & Minecraft moderation experience?")
           .setPlaceholder("Mention any experience managing servers, plugins, bots, etc.")
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(true)

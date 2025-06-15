@@ -178,10 +178,19 @@ async function handleReloadButton(interaction) {
         });
     } catch (error) {
         console.error('Error handling reload button:', error);
-        await interaction.reply({
-            content: '❌ An error occurred while reloading the panel.',
-            ephemeral: true
-        });
+        // Only reply if the interaction hasn't been replied to yet
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({
+                content: '❌ An error occurred while reloading the panel.',
+                ephemeral: true
+            }).catch(err => console.error('Failed to send error reply for reload button:', err));
+        } else if (interaction.replied) {
+            // If already replied, use followUp instead
+            await interaction.followUp({
+                content: '❌ An error occurred while reloading the panel.',
+                ephemeral: true
+            }).catch(err => console.error('Failed to follow up for reload button error:', err));
+        }
     }
 }
 
