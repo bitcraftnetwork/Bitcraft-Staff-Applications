@@ -1,0 +1,24 @@
+{
+  "name": "staff-applications-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot for managing staff applications",
+  "main": "src/index.js",  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": ["discord", "bot", "staff", "applications"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "discord.js": "^14.11.0",
+    "dotenv": "^16.0.3",
+    "mongoose": "^7.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=16.9.0"
+  }
+}
