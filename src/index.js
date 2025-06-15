@@ -3,6 +3,7 @@ const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
+const express = require('express');
 
 // Create client instance
 const client = new Client({
@@ -70,3 +71,9 @@ setInterval(() => {
 client.once('ready', () => {
     syncAllPanels(client).catch(err => console.error('Error in initial panel sync:', err));
 });
+
+// Add a minimal Express server for Render.com compatibility
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot is running!'));
+app.listen(PORT, () => console.log(`Web server listening on port ${PORT}`));
