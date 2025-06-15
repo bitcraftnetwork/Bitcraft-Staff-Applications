@@ -27,7 +27,10 @@ module.exports = {
       '🔔 **Notification Channel**\n' +
       '📚 **History Channel**\n\n' +
       'Click the button below to begin.'
-    ).setFooter({ text: 'You can cancel at any time by typing cancel.' });
+    ).setFooter({ 
+      text: "You can cancel at any time by typing cancel • Made with ♥ by BitCraft Network",
+      iconURL: "https://i.imgur.com/OMqZfgz.png"
+    });
 
     const startButton = new ButtonBuilder()
       .setCustomId('sa_create_modal')

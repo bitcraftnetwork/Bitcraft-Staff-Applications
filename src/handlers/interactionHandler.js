@@ -85,26 +85,153 @@ class InteractionHandler {
                 ?.map((r) => `<@&${r}>`)
                 .join(", ") || "None set"
             }`
-        );
-
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId("confirm_previous_config")
-            .setLabel("Use These Settings")
-            .setStyle(ButtonStyle.Success)
-            .setEmoji("✅"),
-          new ButtonBuilder()
-            .setCustomId("new_application_config")
-            .setLabel("Configure Manually")
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji("⚙️")
-        );
-
-        await interaction.reply({
-          embeds: [configEmbed],
-          components: [row],
-          ephemeral: true,
+        ).setFooter({ 
+          text: "Configuration management • Made with ♥ by BitCraft Network",
+          iconURL: "https://i.imgur.com/OMqZfgz.png"
         });
+
+        // Send the message with the configuration details
+        const sentMessage = await interaction.reply({
+          embeds: [configEmbed],
+          fetchReply: true,
+          ephemeral: false, // Make it visible so reactions can be added
+        });
+
+        // Add reactions for the admin to choose
+        await sentMessage.react('✅'); // Tick reaction
+        await sentMessage.react('❌'); // X reaction
+
+        // Create a filter to only collect reactions from the admin who initiated
+        const filter = (reaction, user) => {
+          return ['✅', '❌'].includes(reaction.emoji.name) && user.id === interaction.user.id;
+        };
+
+        // Wait for the admin's reaction
+        try {
+          const collected = await sentMessage.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] });
+          const reaction = collected.first();
+
+          // If admin reacts with tick, use previous configuration
+          if (reaction.emoji.name === '✅') {
+            // Show loading message
+            await sentMessage.edit({
+              content: "⏳ Creating application and setting up channels... Please wait.",
+              embeds: [],
+            });
+
+            // Create a new application with previous configuration
+            const application = new Application({
+              ...lastApplication.toObject(),
+              _id: undefined, // Remove the _id to create a new document
+              active: true,
+            });
+
+            await application.save();
+            
+            // Sync panels after creating the application
+            const { syncAllPanels } = require('./panelSync');
+            await syncAllPanels(interaction.client);
+
+            // Clean up messages in the channel
+            try {
+              // Fetch messages in the channel
+              const messages = await interaction.channel.messages.fetch({ limit: 100 });
+              
+              // Find the original !sa command message and its response
+              const saCommandMessage = messages.find(msg => 
+                !msg.author.bot && 
+                msg.content.startsWith('!sa') && 
+                msg.content.trim() === '!sa'
+              );
+              
+              // If we found the !sa command message
+              if (saCommandMessage) {
+                // Find the bot's response to the !sa command (the embed with the button)
+                const saResponseMessage = messages.find(msg => 
+                  msg.author.bot && 
+                  msg.embeds.length > 0 && 
+                  msg.embeds[0].title && 
+                  msg.embeds[0].title.includes('Create Staff Application')
+                );
+                
+                // Delete all messages between the !sa command response and the current time
+                // except for the !sa command and its response and the sentMessage
+                const messagesToDelete = messages.filter(msg => 
+                  msg.id !== saCommandMessage.id && 
+                  (saResponseMessage ? msg.id !== saResponseMessage.id : true) && 
+                  msg.id !== sentMessage.id && 
+                  msg.createdTimestamp > (saResponseMessage ? saResponseMessage.createdTimestamp : 0)
+                );
+                
+                // Delete messages in batches if possible, or one by one
+                if (messagesToDelete.size > 0) {
+                  // Use bulkDelete for messages less than 14 days old
+                  const recentMessages = messagesToDelete.filter(msg => 
+                    (Date.now() - msg.createdTimestamp) < 1209600000 // 14 days in milliseconds
+                  );
+                  
+                  if (recentMessages.size > 0) {
+                    await interaction.channel.bulkDelete(recentMessages);
+                  }
+                  
+                  // Delete older messages individually
+                  const olderMessages = messagesToDelete.filter(msg => 
+                    (Date.now() - msg.createdTimestamp) >= 1209600000
+                  );
+                  
+                  for (const msg of olderMessages.values()) {
+                    try {
+                      await msg.delete();
+                    } catch (err) {
+                      console.error('Error deleting older message:', err);
+                    }
+                  }
+                }
+              }
+            } catch (cleanupError) {
+              console.error('Error cleaning up messages:', cleanupError);
+            }
+
+            await sentMessage.edit({
+              content: "✅ Previous configuration has been used to create a new application.",
+              embeds: [],
+            });
+            
+            // Set a timeout to remove the success message after 7 seconds
+            setTimeout(async () => {
+              try {
+                await sentMessage.delete();
+              } catch (error) {
+                console.error('Error deleting success message:', error);
+              }
+            }, 7000);
+          } 
+          // If admin reacts with X, show the application creation modal
+          else if (reaction.emoji.name === '❌') {
+            await sentMessage.edit({
+              content: "You chose to configure manually. Please fill out the application details.",
+              embeds: [],
+            });
+            
+            const modal = createApplicationModal();
+            await interaction.followUp({
+              content: "Please fill out the application details in the modal.",
+              ephemeral: true,
+              components: [new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                  .setCustomId("new_application_config")
+                  .setLabel("Open Configuration Modal")
+                  .setStyle(ButtonStyle.Primary)
+              )]
+            });
+          }
+        } catch (error) {
+          // If no reaction after timeout
+          await sentMessage.edit({
+            content: "⏱️ No reaction received. Application creation cancelled.",
+            embeds: [],
+          });
+        }
       } catch (error) {
         console.error("Error in use_previous_config button:", error);
         await this.handleError(interaction);
@@ -146,18 +273,6 @@ class InteractionHandler {
         console.error("Error in confirm_previous_config button:", error);
         await this.handleError(interaction);
       }
-    });
-
-    this.buttons.set('sa_create_modal', async (interaction) => {
-      // Only allow admins
-      if (!interaction.member.permissions.has('Administrator')) {
-        return interaction.reply({
-          content: '❌ You do not have permission to manage staff applications.',
-          ephemeral: true,
-        });
-      }
-      const modal = createApplicationModal();
-      await interaction.showModal(modal);
     });
 
     // Select Menu Handlers
@@ -216,77 +331,85 @@ class InteractionHandler {
     const customId = interaction.customId;
     let handler;
     let handlerId;
-    // Prefix-matching for dynamic button IDs
-    if (customId.startsWith('accept_')) {
-      handlerId = 'accept';
-      handler = this.buttons.get(handlerId);
-      if (handler) {
-        const submissionId = customId.replace('accept_', '');
-        await handler(interaction, submissionId);
-        return;
-      }
-    } else if (customId.startsWith('reject_')) {
-      handlerId = 'reject';
-      handler = this.buttons.get(handlerId);
-      if (handler) {
-        const submissionId = customId.replace('reject_', '');
-        await handler(interaction, submissionId);
-        return;
-      }
-    } else if (customId.startsWith('update_app_')) {
-      handlerId = 'update_app';
-      handler = this.buttons.get(handlerId);
-      if (handler) {
-        const applicationId = customId.replace('update_app_', '');
-        await handler(interaction, applicationId);
-        return;
-      }
-    } else if (customId.startsWith('delete_app_')) {
-      handlerId = 'delete_app';
-      handler = this.buttons.get(handlerId);
-      if (handler) {
-        const applicationId = customId.replace('delete_app_', '');
-        await handler(interaction, applicationId);
-        return;
-      }
-    } else if (customId.startsWith('continue_setup')) {
-      handlerId = 'continue_setup';
-      handler = this.buttons.get(handlerId);
-      if (handler) {
+    
+    try {
+      // Prefix-matching for dynamic button IDs
+      if (customId.startsWith('accept_')) {
+        handlerId = 'accept';
+        handler = this.buttons.get(handlerId);
+        if (handler) {
+          const submissionId = customId.replace('accept_', '');
+          await handler(interaction, submissionId);
+          return;
+        }
+      } else if (customId.startsWith('reject_')) {
+        handlerId = 'reject';
+        handler = this.buttons.get(handlerId);
+        if (handler) {
+          const submissionId = customId.replace('reject_', '');
+          await handler(interaction, submissionId);
+          return;
+        }
+      } else if (customId.startsWith('update_app_')) {
+        handlerId = 'update_app';
+        handler = this.buttons.get(handlerId);
+        if (handler) {
+          const applicationId = customId.replace('update_app_', '');
+          await handler(interaction, applicationId);
+          return;
+        }
+      } else if (customId.startsWith('delete_app_')) {
+        handlerId = 'delete_app';
+        handler = this.buttons.get(handlerId);
+        if (handler) {
+          const applicationId = customId.replace('delete_app_', '');
+          await handler(interaction, applicationId);
+          return;
+        }
+      } else if (customId.startsWith('continue_setup')) {
+        handlerId = 'continue_setup';
+        handler = this.buttons.get(handlerId);
+        if (handler) {
+          await handler(interaction);
+          return;
+        }
+      } else if (customId.startsWith('submit_application_')) {
+        // This is a modal, not a button, but for future-proofing
+        handlerId = 'submit_application';
+        handler = this.buttons.get(handlerId);
+        if (handler) {
+          const applicationId = customId.replace('submit_application_', '');
+          await handler(interaction, applicationId);
+          return;
+        }
+      } else if (this.buttons.has(customId)) {
+        handler = this.buttons.get(customId);
         await handler(interaction);
         return;
       }
-    } else if (customId.startsWith('resubmit_yes')) {
-      handlerId = 'resubmit_yes';
-      handler = this.buttons.get(handlerId);
-      if (handler) {
-        await handler(interaction);
-        return;
+      // Fallback: log and reply
+      console.error(`No handler found for button: ${customId}`);
+      await this.handleError(interaction);
+    } catch (error) {
+      console.error(`Error handling button interaction (${customId}):`, error);
+      // Try to respond with an error message if possible
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: '❌ An error occurred while processing your request.',
+            ephemeral: true
+          });
+        } else if (interaction.replied) {
+          await interaction.followUp({
+            content: '❌ An error occurred while processing your request.',
+            ephemeral: true
+          });
+        }
+      } catch (replyError) {
+        console.error('Failed to send error reply:', replyError);
+        // If the interaction is no longer valid, we can't do anything about it
       }
-    } else if (customId.startsWith('resubmit_no')) {
-      handlerId = 'resubmit_no';
-      handler = this.buttons.get(handlerId);
-      if (handler) {
-        await handler(interaction);
-        return;
-      }
-    } else if (customId.startsWith('submit_application_')) {
-      // This is a modal, not a button, but for future-proofing
-      handlerId = 'submit_application';
-      handler = this.buttons.get(handlerId);
-      if (handler) {
-        const applicationId = customId.replace('submit_application_', '');
-        await handler(interaction, applicationId);
-        return;
-      }
-    } else if (this.buttons.has(customId)) {
-      handler = this.buttons.get(customId);
-      await handler(interaction);
-      return;
     }
-    // Fallback: log and reply
-    console.error(`No handler found for button: ${customId}`);
-    await this.handleError(interaction);
   }
 
   /**
@@ -349,21 +472,43 @@ class InteractionHandler {
     const customId = interaction.customId;
     let handler;
     let handlerId;
-    if (customId.startsWith('apply')) {
-      handlerId = 'apply';
-      handler = this.selectMenus.get(handlerId);
-      if (handler) {
+    
+    try {
+      if (customId.startsWith('apply')) {
+        handlerId = 'apply';
+        handler = this.selectMenus.get(handlerId);
+        if (handler) {
+          await handler(interaction);
+          return;
+        }
+      } else if (this.selectMenus.has(customId)) {
+        handler = this.selectMenus.get(customId);
         await handler(interaction);
         return;
       }
-    } else if (this.selectMenus.has(customId)) {
-      handler = this.selectMenus.get(customId);
-      await handler(interaction);
-      return;
+      // Fallback: log and reply
+      console.error(`No handler found for select menu: ${customId}`);
+      await this.handleError(interaction);
+    } catch (error) {
+      console.error(`Error handling select menu interaction (${customId}):`, error);
+      // Try to respond with an error message if possible
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: '❌ An error occurred while processing your request.',
+            ephemeral: true
+          });
+        } else if (interaction.replied) {
+          await interaction.followUp({
+            content: '❌ An error occurred while processing your request.',
+            ephemeral: true
+          });
+        }
+      } catch (replyError) {
+        console.error('Failed to send error reply:', replyError);
+        // If the interaction is no longer valid, we can't do anything about it
+      }
     }
-    // Fallback: log and reply
-    console.error(`No handler found for select menu: ${customId}`);
-    await this.handleError(interaction);
   }
 
   async handleError(interaction, error) {

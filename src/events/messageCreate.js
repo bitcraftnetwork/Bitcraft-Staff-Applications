@@ -15,6 +15,7 @@ const { isAdmin, isApplicationOpen } = require("../utils/permissionUtils");
 const Application = require("../models/Application");
 const Submission = require("../models/Submission");
 const Panel = require("../models/Panel");
+const envConfig = require("../config/env");
 
 // Global cache to track !sau response messages for deletion
 const sauMessageCache = [];
@@ -22,10 +23,13 @@ const sauMessageCache = [];
 module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
-    // Ignore messages from bots and non-prefix messages
-    if (message.author.bot || !message.content.startsWith("!")) return;
+    // Get the command prefix from environment config
+    const PREFIX = envConfig.COMMAND_PREFIX;
 
-    const args = message.content.slice(1).trim().split(/ +/);
+    // Ignore messages from bots and non-prefix messages
+    if (message.author.bot || !message.content.startsWith(PREFIX)) return;
+
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
     try {
@@ -47,7 +51,7 @@ module.exports = {
 
           const embed = createEmbed(
             "Create Staff Application",
-            "📝 Click the button below to create a new staff application position!\n\n" +
+            "Click the button below to create a new staff application position!\n\n" +
               "You'll be asked to provide:\n" +
               "• Position Name\n" +
               "• Description/Responsibilities\n" +
@@ -56,7 +60,7 @@ module.exports = {
               "• Role ID for accepted applicants"
           );
 
-          await message.reply({
+          await message.channel.send({
             embeds: [embed],
             components: [row1],
           });
@@ -70,7 +74,7 @@ module.exports = {
           }
           const channel = message.mentions.channels.first();
           if (!channel) {
-            return message.reply("❌ Please mention a channel: !sap #channel");
+            return message.reply(`❌ Please mention a channel: ${PREFIX}sap #channel`);
           }
 
           // Get all active applications
@@ -177,7 +181,7 @@ module.exports = {
           }
           if (!args[0]) {
             return message.reply(
-              "❌ Please provide a position ID: !toggle <position_id>"
+              `❌ Please provide a position ID: ${PREFIX}toggle <position_id>`
             );
           }
 
@@ -244,14 +248,16 @@ module.exports = {
             "📝 Welcome to the Staff Applications System!\n\n" +
               "Available Commands:\n\n" +
               "**Admin Commands:**\n" +
-              "`!sa` - Start creating a new staff application\n" +
-              "`!sap #channel` - Send/update application panel in a channel\n" +
-              "`!vap` - View all active application panels\n" +
-              "`!toggle position_id` - Enable/disable a position\n" +
-              "`!status @user` - View applications for a specific user\n\n" +
+              `\`${PREFIX}sa\` - Start creating a new staff application\n` +
+              `\`${PREFIX}sap #channel\` - Send/update application panel\n` +
+              `\`${PREFIX}vap\` - View all active application panels\n` +
+              `\`${PREFIX}toggle position_id\` - Enable/disable a position\n` +
+              `\`${PREFIX}status @user\` - View applications for a specific user\n` +
+              `\`${PREFIX}add @user\` - Grant a user access to the current channel\n` +
+              `\`${PREFIX}remove @user\` or \`${PREFIX}rm @user\` - Remove a user's access from the current channel\n\n` +
               "**User Commands:**\n" +
-              "`!status` - Check your application status\n" +
-              "`!help` - Show this help message\n\n" +
+              `\`${PREFIX}status\` - Check your application status\n` +
+              `\`${PREFIX}help\` - Show this help message\n\n` +
               "**How to Apply:**\n" +
               "1. Find an application panel in the designated channel\n" +
               "2. Click the position you want to apply for\n" +
@@ -260,6 +266,89 @@ module.exports = {
           );
 
           await message.reply({ embeds: [helpEmbed] });
+          break;
+
+        case "sahelp":
+          const sahelpEmbed = createEmbed(
+            "📚 Staff Applications System Guide",
+            "Welcome to the Staff Applications System! This guide will help you understand all the features and commands available.\n\n" +
+            
+            "**🎯 Core Features**\n" +
+            "• Create and manage staff application positions\n" +
+            "• Customizable application forms\n" +
+            "• Application panels with select menus\n" +
+            "• Notification system for new applications\n" +
+            "• Application history tracking\n" +
+            "• Role assignment upon acceptance\n" +
+            "• Temporary channel access management\n\n" +
+            
+            "**👑 Admin Commands**\n" +
+            `\`${PREFIX}sa\` - Start creating a new staff application\n` +
+            "┗ Creates a new application position with customizable settings\n" +
+            "┗ Configure position name, description, duration, and more\n\n" +
+            
+            `\`${PREFIX}sap #channel\` - Send/update application panel\n` +
+            "┗ Creates an interactive panel in the specified channel\n" +
+            "┗ Shows all active positions with a select menu\n" +
+            "┗ Includes a reload button to refresh the panel\n\n" +
+            
+            `\`${PREFIX}sau\` - Update/Delete Applications\n` +
+            "┗ Shows all applications with update/delete buttons\n" +
+            "┗ Messages auto-delete after 2 minutes\n" +
+            "┗ Allows quick management of existing applications\n\n" +
+            
+            `\`${PREFIX}vap\` - View Active Panels\n` +
+            "┗ Lists all active application panels\n" +
+            "┗ Shows position details and channel locations\n\n" +
+            
+            `\`${PREFIX}toggle position_id\` - Enable/Disable Position\n` +
+            "┗ Quickly enable or disable an application position\n" +
+            "┗ Useful for temporarily closing applications\n\n" +
+            
+            `\`${PREFIX}status @user\` - View User Applications\n` +
+            "┗ Check application status for any user\n" +
+            "┗ Shows all their submissions and current status\n\n" +
+            
+            `\`${PREFIX}add @user\` - Grant Channel Access\n` +
+            "┗ Gives a user temporary access to the current channel\n" +
+            "┗ Useful for adding users to private channels without role changes\n\n" +
+            
+            `\`${PREFIX}remove @user\` or \`${PREFIX}rm @user\` - Remove Channel Access\n` +
+            "┗ Removes a user's access from the current channel\n" +
+            "┗ Reverts permissions granted by the add command\n\n" +
+            
+            "**👤 User Commands**\n" +
+            `\`${PREFIX}status\` - Check Your Applications\n` +
+            "┗ View all your submitted applications\n" +
+            "┗ See current status and review details\n\n" +
+            
+            "**📋 Application Process**\n" +
+            "1. Find an application panel in the designated channel\n" +
+            "2. Select the position you want to apply for\n" +
+            "3. Fill out the application form with your details\n" +
+            "4. Wait for staff to review your application\n" +
+            "5. Receive notification of acceptance/rejection\n\n" +
+            
+            "**⚙️ System Features**\n" +
+            "• Automatic role assignment upon acceptance\n" +
+            "• Notification system for new applications\n" +
+            "• Application history tracking\n" +
+            "• Customizable management roles\n" +
+            "• Support for multiple active positions\n" +
+            "• Automatic panel updates\n" +
+            "• Temporary channel access management\n\n" +
+            
+            "**🔔 Notifications**\n" +
+            "• New applications ping management roles\n" +
+            "• Applicants receive DM notifications\n" +
+            "• History channel tracks all actions\n" +
+            "• Panel updates are automatic\n\n"
+          ).setFooter({ 
+            text: "Staff Applications System v1.0 • Made with ♥ by BitCraft Network",
+            iconURL: "https://i.imgur.com/OMqZfgz.png"
+          });
+
+          await message.channel.send({ embeds: [sahelpEmbed] });
           break;
 
         case "sau":
@@ -272,6 +361,30 @@ module.exports = {
           if (allApplications.length === 0) {
             return message.reply("📝 There are no applications in the system.");
           }
+
+          // Clear any existing messages in the cache
+          if (sauMessageCache && sauMessageCache.length) {
+            for (const msg of sauMessageCache) {
+              try { await msg.delete(); } catch (e) {}
+            }
+            sauMessageCache.length = 0;
+          }
+
+          // Store the original command message for later deletion
+          sauMessageCache.push(message);
+
+          // Set timeout to delete the original command message after 120 seconds
+          setTimeout(async () => {
+            try {
+              await message.delete();
+              // Remove from cache after deletion
+              const index = sauMessageCache.indexOf(message);
+              if (index > -1) {
+                sauMessageCache.splice(index, 1);
+              }
+            } catch (e) { /* ignore if already deleted */ }
+          }, 120000);
+
           for (const app of allApplications) {
             const appEmbed = createEmbed(
               `Application: ${app.positionName}`,
@@ -293,14 +406,76 @@ module.exports = {
               .setStyle(ButtonStyle.Danger)
               .setEmoji("🗑️");
             const row = new ActionRowBuilder().addComponents(updateButton, deleteButton);
-            const sentMsg = await message.reply({ embeds: [appEmbed], components: [row] });
+            const sentMsg = await message.channel.send({ embeds: [appEmbed], components: [row] });
             // Track the message for later deletion
             sauMessageCache.push(sentMsg);
             setTimeout(async () => {
               try {
                 await sentMsg.delete();
+                // Remove from cache after deletion
+                const index = sauMessageCache.indexOf(sentMsg);
+                if (index > -1) {
+                  sauMessageCache.splice(index, 1);
+                }
               } catch (e) { /* ignore if already deleted */ }
             }, 120000);
+          }
+          break;
+
+        case "add":
+          // Check if a user was mentioned
+          const userToAdd = message.mentions.users.first();
+          if (!userToAdd) {
+            return message.reply("❌ Please mention a user: `!add @user`");
+          }
+
+          // Check if the command user has permission to manage channels
+          if (!message.member.permissions.has("ManageChannels")) {
+            return message.reply("❌ You do not have permission to manage channel access.");
+          }
+
+          try {
+            // Get the member object from the mentioned user
+            const memberToAdd = await message.guild.members.fetch(userToAdd.id);
+            
+            // Add the user to the current channel by modifying permission overwrites
+            await message.channel.permissionOverwrites.edit(memberToAdd, {
+              ViewChannel: true,
+              SendMessages: true,
+              ReadMessageHistory: true
+            });
+
+            await message.reply(`✅ ${userToAdd} has been granted access to this channel.`);
+          } catch (error) {
+            console.error("Error adding user to channel:", error);
+            await message.reply("❌ An error occurred while adding the user to this channel.");
+          }
+          break;
+
+        case "remove":
+        case "rm":
+          // Check if a user was mentioned
+          const userToRemove = message.mentions.users.first();
+          if (!userToRemove) {
+            return message.reply("❌ Please mention a user: `!remove @user` or `!rm @user`");
+          }
+
+          // Check if the command user has permission to manage channels
+          if (!message.member.permissions.has("ManageChannels")) {
+            return message.reply("❌ You do not have permission to manage channel access.");
+          }
+
+          try {
+            // Get the member object from the mentioned user
+            const memberToRemove = await message.guild.members.fetch(userToRemove.id);
+            
+            // Remove the user's access to the current channel
+            await message.channel.permissionOverwrites.delete(memberToRemove);
+
+            await message.reply(`✅ ${userToRemove} has been removed from this channel.`);
+          } catch (error) {
+            console.error("Error removing user from channel:", error);
+            await message.reply("❌ An error occurred while removing the user from this channel.");
           }
           break;
       }

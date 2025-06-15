@@ -29,9 +29,6 @@ const applicationCreationCache = new Map();
 
 modalHandlers.set("create_application", async (interaction) => {
   try {
-    // Defer immediately to avoid Discord timeout
-    await interaction.deferReply({ ephemeral: true });
-
     let errorMsg = null;
 
     if (!(await isAdmin(interaction.member))) {
@@ -55,12 +52,13 @@ modalHandlers.set("create_application", async (interaction) => {
     }
 
     if (errorMsg) {
-      await interaction.followUp({ content: errorMsg, ephemeral: true });
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: errorMsg, ephemeral: true });
+      }
       return;
     }
 
     // Immediately collect management roles and channels
-    const cacheKey = `${interaction.user.id}_${Date.now()}`;
     const duration = {
       type: durationDays > 0 ? 'days' : 'untilFilled',
       days: durationDays,
@@ -73,15 +71,17 @@ modalHandlers.set("create_application", async (interaction) => {
       duration,
       roleId
     };
-    applicationCreationCache.set(cacheKey, initialData);
 
     // Collect management roles and channels
     const { collectManagementRoles, collectChannels } = require('./collectorHandlers');
     const validateRole = (roleId) => interaction.guild.roles.cache.has(roleId);
     const validateChannel = (channelId) => interaction.guild.channels.cache.has(channelId);
 
-    // Edit the deferred reply for the first message
-    await interaction.editReply({ content: 'Please complete the management roles and channel configuration in the next steps...' });
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: 'Please complete the management roles and channel configuration in the next steps...', ephemeral: true });
+    } else {
+      await interaction.followUp({ content: 'Please complete the management roles and channel configuration in the next steps...', ephemeral: true });
+    }
 
     try {
       // Collect management roles
@@ -92,11 +92,17 @@ modalHandlers.set("create_application", async (interaction) => {
         validateRole
       );
       if (managementRoles === 'cancel') {
-        await interaction.followUp({
-          content: "❌ Application creation cancelled.",
-          ephemeral: true,
-        });
-        applicationCreationCache.delete(cacheKey);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: "❌ Application creation cancelled.",
+            ephemeral: true,
+          });
+        } else {
+          await interaction.followUp({
+            content: "❌ Application creation cancelled.",
+            ephemeral: true,
+          });
+        }
         return;
       }
       // Collect channel IDs
@@ -107,41 +113,139 @@ modalHandlers.set("create_application", async (interaction) => {
         validateChannel
       );
       if (channels === 'cancel') {
-        await interaction.followUp({
-          content: "❌ Application creation cancelled.",
-          ephemeral: true,
-        });
-        applicationCreationCache.delete(cacheKey);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: "❌ Application creation cancelled.",
+            ephemeral: true,
+          });
+        } else {
+          await interaction.followUp({
+            content: "❌ Application creation cancelled.",
+            ephemeral: true,
+          });
+        }
         return;
       }
-      // Prepare for resubmit decision
-      const appData = {
+      // Send a loading message first
+      const loadingMessage = await interaction.channel.send({
+        content: '⏳ Creating application and setting up channels... Please wait.',
+      });
+
+      // Create and save the application immediately (no resubmit option)
+      const application = new Application({
         ...initialData,
         managementRoles: typeof managementRoles === 'string' ? [] : managementRoles,
         acceptingRoles: typeof managementRoles === 'string' ? [] : managementRoles,
-        channels: typeof channels === 'string' ? {
-          panel: '', notifications: '', history: ''
-        } : channels,
-        guildId: interaction.guildId
-      };
-      applicationCreationCache.set(cacheKey, appData);
-      const { embed, components } = createResubmitDecisionEmbed(cacheKey);
-      await interaction.followUp({ embeds: [embed], components, ephemeral: true });
-    } catch (error) {
-      console.error('Error in management/channel collection:', error);
+        channels: {
+          // Always ensure channel IDs are set properly
+          panel: typeof channels === 'string' ? interaction.channel.id : channels.panel,
+          notifications: typeof channels === 'string' ? interaction.channel.id : channels.notifications,
+          history: typeof channels === 'string' ? interaction.channel.id : channels.history
+        },
+        guildId: interaction.guildId,
+        allowResubmit: false, // Default to false, or set as needed
+        active: true
+      });
+      
+      // Log the application data before saving to verify channel IDs are set
+      console.log('Creating application with channels:', application.channels);
+      
+      await application.save();
+      // Sync panels
+      await syncAllPanels(interaction.client);
+
+      // Clean up messages in the channel
+      try {
+        // Fetch messages in the channel
+        const messages = await interaction.channel.messages.fetch({ limit: 100 });
+        
+        // Find the original !sa command message and its response
+        const saCommandMessage = messages.find(msg => 
+          !msg.author.bot && 
+          msg.content.startsWith('!sa') && 
+          msg.content.trim() === '!sa'
+        );
+        
+        // If we found the !sa command message
+        if (saCommandMessage) {
+          // Find the bot's response to the !sa command (the embed with the button)
+          const saResponseMessage = messages.find(msg => 
+            msg.author.bot && 
+            msg.embeds.length > 0 && 
+            msg.embeds[0].title && 
+            msg.embeds[0].title.includes('Create Staff Application')
+          );
+          
+          // Delete all messages between the !sa command response and the current time
+          // except for the !sa command and its response
+          const messagesToDelete = messages.filter(msg => 
+            msg.id !== saCommandMessage.id && 
+            (saResponseMessage ? msg.id !== saResponseMessage.id : true) && 
+            msg.id !== loadingMessage.id && 
+            msg.createdTimestamp > (saResponseMessage ? saResponseMessage.createdTimestamp : 0)
+          );
+          
+          // Delete messages in batches if possible, or one by one
+          if (messagesToDelete.size > 0) {
+            // Use bulkDelete for messages less than 14 days old
+            const recentMessages = messagesToDelete.filter(msg => 
+              (Date.now() - msg.createdTimestamp) < 1209600000 // 14 days in milliseconds
+            );
+            
+            if (recentMessages.size > 0) {
+              await interaction.channel.bulkDelete(recentMessages);
+            }
+            
+            // Delete older messages individually
+            const olderMessages = messagesToDelete.filter(msg => 
+              (Date.now() - msg.createdTimestamp) >= 1209600000
+            );
+            
+            for (const msg of olderMessages.values()) {
+              try {
+                await msg.delete();
+              } catch (err) {
+                console.error('Error deleting older message:', err);
+              }
+            }
+          }
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up messages:', cleanupError);
+      }
+
+      // Update the loading message with success
+      await loadingMessage.edit({
+        content: `✅ Application for **${positionName}** has been created successfully!`,
+      });
+      
+      // Set a timeout to remove the success message after 7 seconds
+      setTimeout(async () => {
+        try {
+          await loadingMessage.delete();
+        } catch (error) {
+          console.error('Error deleting success message:', error);
+        }
+      }, 7000);
+      
       await interaction.followUp({
-        content: '❌ An error occurred during management/channel configuration.',
+        content: `✅ Application for **${positionName}** has been created successfully!`,
         ephemeral: true
       });
-      applicationCreationCache.delete(cacheKey);
+    } catch (stepError) {
+      console.error("Error in create_application modal (step):", stepError);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: "❌ An error occurred during application setup.", ephemeral: true });
+      } else {
+        await interaction.followUp({ content: "❌ An error occurred during application setup.", ephemeral: true });
+      }
     }
   } catch (error) {
     console.error("Error in create_application modal:", error);
     if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: "❌ An error occurred while creating the application.",
-        ephemeral: true,
-      });
+      await interaction.reply({ content: "❌ An error occurred while processing your request.", ephemeral: true });
+    } else {
+      await interaction.followUp({ content: "❌ An error occurred while processing your request.", ephemeral: true });
     }
   }
 });
@@ -223,9 +327,12 @@ modalHandlers.set("submit_application", async (interaction, applicationId) => {
       
       if (notify) {
         const embed = createEmbed(
-          "📝 New Application Submitted",
+          "New Application Submitted",
           `**User:** ${interaction.user.tag}\n**Position:** ${application.positionName}`
-        );
+        ).setFooter({ 
+          text: "New application awaiting review • Made with ♥ by BitCraft Network",
+          iconURL: "https://i.imgur.com/OMqZfgz.png"
+        });
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
@@ -240,7 +347,7 @@ modalHandlers.set("submit_application", async (interaction, applicationId) => {
             .setEmoji("❌")
         );
 
-        await notify.send({ embeds: [embed], components: [row] });
+        await notify.send({ content: `<@&${process.env.DEFAULT_ADMIN_ROLES}>`, embeds: [embed], components: [row] });
       }
     } catch (notifyError) {
       console.error("Error sending notification:", notifyError);
@@ -333,6 +440,17 @@ modalHandlers.set("reject_application", async (interaction, submissionId) => {
 
     // Delete the submission from MongoDB
     await Submission.findByIdAndDelete(submissionId);
+    
+    // Delete the application from MongoDB when rejected
+    await Application.findByIdAndDelete(application._id);
+    
+    // Delete all !sau messages and clear cache
+    if (sauMessageCache && sauMessageCache.length) {
+      for (const msg of sauMessageCache) {
+        try { await msg.delete(); } catch (e) {}
+      }
+      sauMessageCache.length = 0;
+    }
 
     // Always sync panels after any changes
     await syncAllPanels(interaction.client);
@@ -454,17 +572,6 @@ modalHandlers.set("accept_application", async (interaction, submissionId) => {
   }
 });
 
-modalHandlers.set('sa_create_modal', async (interaction) => {
-  if (!interaction.member.permissions.has('Administrator')) {
-    return interaction.reply({
-      content: '❌ You do not have permission to manage staff applications.',
-      ephemeral: true,
-    });
-  }
-  const modal = createApplicationModal();
-  await interaction.showModal(modal);
-});
-
 // Add to existing modalHandlers collection
 modalHandlers.set('confirm_delete', async (interaction, applicationId) => {
     try {
@@ -507,6 +614,14 @@ modalHandlers.set('confirm_delete', async (interaction, applicationId) => {
         // Update panels
         await syncAllPanels(interaction.client);
 
+        // Delete all !sau messages and clear cache
+        if (sauMessageCache && sauMessageCache.length) {
+          for (const msg of sauMessageCache) {
+            try { await msg.delete(); } catch (e) {}
+          }
+          sauMessageCache.length = 0;
+        }
+
         // Log to history channel
         try {
             const historyChannel = interaction.guild.channels.cache.get(application.channels.history);
@@ -516,7 +631,11 @@ modalHandlers.set('confirm_delete', async (interaction, applicationId) => {
                     `**Position:** ${positionName}\n` +
                     `**Deleted by:** ${interaction.user.tag}\n` +
                     `**Time:** ${new Date().toLocaleString()}`
-                ).setColor('#FF0000');
+                ).setColor('#FF0000')
+                 .setFooter({ 
+                    text: "Application management • Made with ♥ by BitCraft Network",
+                    iconURL: "https://i.imgur.com/OMqZfgz.png"
+                 });
 
                 await historyChannel.send({ embeds: [logEmbed] });
             }

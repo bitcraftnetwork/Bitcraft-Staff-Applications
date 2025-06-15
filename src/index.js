@@ -1,9 +1,16 @@
-require('dotenv').config();
+// Load environment configuration based on the current npm script
+const envConfig = require('./config/env');
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+
+// Log the current environment
+console.log(`🌍 Current environment: ${envConfig.NODE_ENV}`);
+console.log(`📄 Environment file: ${envConfig.ENV_FILE}`);
+console.log(`🔧 Command prefix: ${envConfig.COMMAND_PREFIX}`);
+
 
 // Create client instance
 const client = new Client({
@@ -23,11 +30,6 @@ client.selects = new Collection();
 // Load interaction handler
 const interactionHandler = require('./handlers/interactionHandler');
 
-// Initialize collections for interaction handlers
-client.buttons = new Collection();
-client.modals = new Collection();
-client.selects = new Collection();
-
 // Load events
 const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
@@ -41,13 +43,9 @@ for (const file of eventFiles) {
         client.on(event.name, (...args) => event.execute(...args));
     }
 }
-client.on("interactionCreate", async (interaction) => {
-  if (interaction.isModalSubmit()) {
-    await interactionHandler.handleModal(interaction);
-  }
-});
+
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(envConfig.MONGO_URI)
     .then(() => console.log('Connected to MongoDB'))
     .catch(err => console.error('MongoDB connection error:', err));
 
@@ -62,10 +60,8 @@ client.login(process.env.DISCORD_TOKEN);
 // Import panel sync handler
 const { syncAllPanels } = require('./handlers/panelSync');
 
-// Set up periodic panel sync (every 5 minutes)
-setInterval(() => {
-    syncAllPanels(client).catch(err => console.error('Error in panel sync interval:', err));
-}, 5 * 60 * 1000);
+// We don't need to periodically sync panels as it's causing duplicate messages
+// The panel will be updated when needed via the reload button or other interactions
 
 // Sync panels on startup
 client.once('ready', () => {

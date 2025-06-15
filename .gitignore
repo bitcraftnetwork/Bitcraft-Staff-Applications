@@ -1,2 +1,10 @@
 /.env
 /node_modules
+/.env-test
+/.env-dev
+# Environment files
+.env
+.env.dev
+.env.test
+.env.local
+.env.production

@@ -14,7 +14,37 @@ function createEmbed(title, description, color = "#2F3136") {
     .setTitle(`📝 ${title}`)
     .setDescription(description)
     .setColor(color)
-    .setTimestamp();
+    .setFooter({ 
+      text: "Made with ♥ by BitCraft Network",
+      iconURL: "https://i.imgur.com/OMqZfgz.png"
+    });
+}
+
+// Create application acceptance embed
+function createAcceptanceEmbed(applicant, position, acceptedBy = null, remainingPositions = null) {
+  const embed = new EmbedBuilder()
+    .setTitle('✅ Application Accepted')
+    .setColor('#00FF00')
+    .addFields(
+      { name: 'Applicant', value: applicant, inline: true },
+      { name: 'Position', value: position, inline: true }
+    );
+  
+  if (acceptedBy) {
+    embed.addFields({ name: 'Accepted by', value: acceptedBy, inline: true });
+  }
+  
+  if (remainingPositions !== null) {
+    embed.addFields({ name: 'Remaining Positions', value: remainingPositions.toString(), inline: true });
+  }
+  
+  embed.addFields({ name: 'Date', value: new Date().toLocaleString(), inline: false })
+    .setFooter({ 
+      text: "Made with ♥ by BitCraft Network",
+      iconURL: "https://i.imgur.com/OMqZfgz.png"
+    });
+  
+  return embed;
 }
 
 // Create application panel embed
@@ -189,8 +219,7 @@ function createStatusEmbed(submission) {
 function createConsolidatedPanel(applications) {
   const embed = new EmbedBuilder()
     .setTitle(`✨ Staff Applications ✨`)
-    .setColor("#2F3136")
-    .setTimestamp();
+    .setColor("#2F3136");
 
   // Handle case when there are no applications
   if (!applications?.length) {
@@ -201,7 +230,10 @@ function createConsolidatedPanel(applications) {
         "Please check back later for new opportunities!"
       )
       .setColor("#808080")
-      .setFooter({ text: "Check back soon for new openings!" });
+      .setFooter({ 
+        text: "Check back soon for new openings! • Made with ♥ by BitCraft Network",
+        iconURL: "https://i.imgur.com/OMqZfgz.png"
+      });
     return { embed, hasApplications: false };
   }
 
@@ -254,7 +286,8 @@ function createConsolidatedPanel(applications) {
         },
       ])
       .setFooter({
-        text: "Click the buttons below to apply for a position.",
+        text: "Click the buttons below to apply for a position • Made with ♥ by BitCraft Network",
+        iconURL: "https://i.imgur.com/OMqZfgz.png"
       });
   });
 
@@ -325,8 +358,10 @@ function createResubmitDecisionEmbed(cacheKey) {
       .setTitle('🔄 Resubmission Option')
       .setDescription('Do you want to let users **resubmit** after their application is rejected?\n\nChoose an option below:')
       .setColor('#5865F2')
-      .setFooter({ text: 'This setting controls if rejected users can re-apply.' })
-      .setTimestamp(),
+      .setFooter({ 
+        text: "This setting controls if rejected users can re-apply • Made with ♥ by BitCraft Network",
+        iconURL: "https://i.imgur.com/OMqZfgz.png"
+      }),
     components: [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -347,6 +382,7 @@ function createResubmitDecisionEmbed(cacheKey) {
 // Add this to your module.exports
 module.exports = {
   createEmbed,
+  createAcceptanceEmbed,
   createApplicationPanel,
   createConsolidatedPanel,
   createApplicationModal,

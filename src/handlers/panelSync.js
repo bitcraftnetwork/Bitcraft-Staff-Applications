@@ -114,8 +114,14 @@ async function createConsolidatedPanelMessage(client, applications, channel) {
                 const message = await channel.messages.fetch(existingPanel.messageId);
                 await message.edit({ embeds: [embed], components });
             } catch (error) {
-                console.error('Error updating existing panel:', error);
-                // If message not found, create new panel
+                // Check if this is an Unknown Message error (10008)
+                if (error.code === 10008) {
+                    console.log(`Panel message no longer exists (ID: ${existingPanel.messageId}). Creating a new one...`);
+                } else {
+                    console.error('Error updating existing panel:', error);
+                }
+                
+                // If message not found or any other error, create new panel
                 const newMessage = await channel.send({ embeds: [embed], components });
                 await Panel.findOneAndUpdate(
                     { channelId: channel.id },

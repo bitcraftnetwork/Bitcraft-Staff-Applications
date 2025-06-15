@@ -46,16 +46,29 @@ selectHandlers.set("apply", async (interaction) => {
       applicationId: applicationId,
     });
 
+    // Debug log for allowResubmit and submission status
+    console.log('[DEBUG] Application allowResubmit:', application.allowResubmit, '| Submission status:', existingSubmission && existingSubmission.status);
+
     if (existingSubmission) {
-      if (existingSubmission.status === "rejected" && application.allowResubmit) {
-        // Allow resubmission: delete the old rejected submission and show the modal
-        await Submission.deleteOne({ _id: existingSubmission._id });
+      if (existingSubmission.status === "rejected") {
+        if (application.allowResubmit) {
+          console.log('[DEBUG] Allowing resubmission for user', interaction.user.id, 'on application', applicationId);
+          // Allow resubmission: delete the old rejected submission and show the modal
+          await Submission.deleteOne({ _id: existingSubmission._id });
+          // Continue to show the modal below
+        } else {
+          console.log('[DEBUG] Blocking resubmission for user', interaction.user.id, 'on application', applicationId);
+          // Block resubmission
+          return interaction.reply({
+            content: "❌ You cannot re-apply for this position. Resubmission is not allowed after rejection.",
+            ephemeral: true,
+          });
+        }
       } else {
+        // Block for all other statuses
         let statusMsg = "";
         if (existingSubmission.status === "pending") {
           statusMsg = "⏳ You have already submitted and it is under review, please wait.";
-        } else if (existingSubmission.status === "rejected") {
-          statusMsg = "❌ You have already submitted and your application was rejected.";
         } else if (existingSubmission.status === "accepted") {
           statusMsg = "✅ You have already submitted and your application was accepted.";
         } else {
