@@ -293,10 +293,11 @@ modalHandlers.set("submit_application", async (interaction, applicationId) => {
     }
 
     const answers = {
-      experience: interaction.fields.getTextInputValue("experience"),
-      previous_staff: interaction.fields.getTextInputValue("previous_staff"),
-      motivation: interaction.fields.getTextInputValue("motivation"),
-      additional_info: interaction.fields.getTextInputValue("additional_info"),
+      age_location: interaction.fields.getTextInputValue("age_location"),
+      availability: interaction.fields.getTextInputValue("availability"),
+      discord_minecraft_experience: interaction.fields.getTextInputValue("discord_minecraft_experience"),
+      why_staff: interaction.fields.getTextInputValue("why_staff"),
+      what_makes_you_unique: interaction.fields.getTextInputValue("what_makes_you_unique") || "Not provided",
     };
 
     // Create submission first

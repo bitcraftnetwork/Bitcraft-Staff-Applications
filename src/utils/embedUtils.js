@@ -136,35 +136,43 @@ function createSubmissionModal() {
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
-          .setCustomId("experience")
-          .setLabel("How much experience do you have?")
-          .setPlaceholder("Describe your relevant experience...")
+          .setCustomId("age_location")
+          .setLabel("What's your age and timezone?")
+          .setPlaceholder("e.g., 17, IST (UTC+5:30)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("availability")
+          .setLabel("When are you usually active?")
+          .setPlaceholder("Days & times you can be available to help (e.g., 4–9PM on weekdays)")
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(true)
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
-          .setCustomId("previous_staff")
-          .setLabel("Previous staff experience?")
-          .setPlaceholder("Any previous staff/moderation roles...")
+          .setCustomId("discord_minecraft_experience")
+          .setLabel("Experience with Discord & Minecraft moderation?")
+          .setPlaceholder("Mention any experience managing servers, plugins, bots, etc.")
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(true)
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
-          .setCustomId("motivation")
-          .setLabel("Why do you want this role?")
-          .setPlaceholder("Explain your motivation...")
+          .setCustomId("why_staff")
+          .setLabel("Why do you want to join the staff team?")
+          .setPlaceholder("Your motivation and what you'd contribute to the server.")
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(true)
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
-          .setCustomId("additional_info")
-          .setLabel("What else can you offer?")
-          .setPlaceholder("Additional skills, availability, etc...")
+          .setCustomId("what_makes_you_unique")
+          .setLabel("What makes you a good fit for this role?")
+          .setPlaceholder("Skills, personality traits, or past examples that stand out.")
           .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true)
+          .setRequired(false)
       )
     );
 }
