@@ -1,5 +1,8 @@
 const { Events } = require('discord.js');
-const interactionHandler = require('../handlers/interactionHandler');
+const { handleButton } = require('../handlers/buttonHandlers');
+const { handleModal } = require('../handlers/modalHandlers');
+const { handleSelect } = require('../handlers/selectHandlers');
+const { createEmbed } = require('../utils/embedUtils');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -10,13 +13,19 @@ module.exports = {
 
             // Route to appropriate handler based on interaction type
             if (interaction.isButton()) {
-                await interactionHandler.handleButton(interaction);
+                // Handle purge command buttons directly
+                if (interaction.customId === 'purge_confirm' || interaction.customId === 'purge_cancel') {
+                    // These are handled directly in the purge command via collector
+                    return;
+                }
+                
+                await handleButton(interaction);
             }
             else if (interaction.isModalSubmit()) {
-                await interactionHandler.handleModal(interaction);
+                await handleModal(interaction);
             }
             else if (interaction.isStringSelectMenu()) {
-                await interactionHandler.handleSelectMenu(interaction);
+                await handleSelect(interaction);
             }
         } catch (error) {
             console.error('Error in interaction handler:', error);

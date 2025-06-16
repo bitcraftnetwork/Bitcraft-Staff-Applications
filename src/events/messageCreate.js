@@ -35,6 +35,7 @@ module.exports = {
     try {
       // Import command files
       const updateEmbedsCommand = require('../commands/updateembeds');
+      const purgeCommand = require('../commands/purge');
       
       switch (command) {
         case "updateembeds":
@@ -486,6 +487,14 @@ module.exports = {
             console.error("Error removing user from channel:", error);
             await message.reply("❌ An error occurred while removing the user from this channel.");
           }
+          break;
+
+        case "purge":
+        case "clear":
+        case "prune":
+        case "clr":
+          // Execute the purge command
+          await purgeCommand.execute(message, args);
           break;
       }
     } catch (error) {
