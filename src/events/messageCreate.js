@@ -449,10 +449,11 @@ module.exports = {
             const memberToAdd = await message.guild.members.fetch(userToAdd.id);
             
             // Add the user to the current channel by modifying permission overwrites
+            // Setting ReadMessageHistory to false as per requirement
             await message.channel.permissionOverwrites.edit(memberToAdd, {
               ViewChannel: true,
               SendMessages: true,
-              ReadMessageHistory: true
+              ReadMessageHistory: false
             });
 
             await message.reply(`✅ ${userToAdd} has been granted access to this channel.`);
