@@ -329,7 +329,7 @@ modalHandlers.set("submit_application", async (interaction, applicationId) => {
       if (notify) {
         const embed = createEmbed(
           "New Application Submitted",
-          `**User:** ${interaction.user.tag}\n**Position:** ${application.positionName}`
+          `**User:** ${interaction.user.tag}\n**Position:** ${application.positionName}\n\n**Age & Timezone:**\n${answers.age_location}\n\n**Availability:**\n${answers.availability}\n\n**Discord & Minecraft Experience:**\n${answers.discord_minecraft_experience}\n\n**Why Staff:**\n${answers.why_staff}\n\n**What Makes You Unique:**\n${answers.what_makes_you_unique || "Not provided"}`
         ).setFooter({ 
           text: "New application awaiting review • Made with ♥ by BitCraft Network",
           iconURL: "https://i.imgur.com/OMqZfgz.png"

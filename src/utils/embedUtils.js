@@ -284,6 +284,7 @@ function createConsolidatedPanel(applications) {
           name: `${emoji} Position Details`,
           value:
             `> **Position:** ${application.positionName}\n` +
+            `> **Description:** ${application.description || "No description provided"}\n` +
             `> **Duration:** ${
               application.duration.type === "days"
                 ? `${application.duration.days} days`

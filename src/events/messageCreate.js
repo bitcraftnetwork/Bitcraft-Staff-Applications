@@ -33,7 +33,16 @@ module.exports = {
     const command = args.shift().toLowerCase();
 
     try {
+      // Import command files
+      const updateEmbedsCommand = require('../commands/updateembeds');
+      
       switch (command) {
+        case "updateembeds":
+          // Execute the updateembeds command
+          // Access client through message.client instead of using client directly
+          await updateEmbedsCommand.execute(message, message.client);
+          break;
+
         case "sa":
           if (!(await isAdmin(message.member))) {
             return message.reply(
