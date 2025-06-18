@@ -1,8 +1,6 @@
-const { Events } = require('discord.js');
-const { handleButton } = require('../handlers/buttonHandlers');
-const { handleModal } = require('../handlers/modalHandlers');
-const { handleSelect } = require('../handlers/selectHandlers');
+const { Events, MessageFlags } = require('discord.js');
 const { createEmbed } = require('../utils/embedUtils');
+const interactionHandler = require('../handlers/interactionHandler');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -19,13 +17,13 @@ module.exports = {
                     return;
                 }
                 
-                await handleButton(interaction);
+                await interactionHandler.handleButton(interaction);
             }
             else if (interaction.isModalSubmit()) {
-                await handleModal(interaction);
+                await interactionHandler.handleModal(interaction);
             }
             else if (interaction.isStringSelectMenu()) {
-                await handleSelect(interaction);
+                await interactionHandler.handleSelectMenu(interaction);
             }
         } catch (error) {
             console.error('Error in interaction handler:', error);
@@ -41,12 +39,12 @@ module.exports = {
                 if (interaction.replied || interaction.deferred) {
                     await interaction.followUp({ 
                         content: errorMessage,
-                        ephemeral: true 
+                        flags: MessageFlags.Ephemeral 
                     }).catch(e => console.error('Failed to follow up with error message:', e));
                 } else {
                     await interaction.reply({ 
                         content: errorMessage,
-                        ephemeral: true 
+                        flags: MessageFlags.Ephemeral 
                     }).catch(e => console.error('Failed to reply with error message:', e));
                 }
             } catch (e) {

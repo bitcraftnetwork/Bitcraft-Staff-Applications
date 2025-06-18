@@ -2,6 +2,7 @@ const Application = require('../models/Application');
 const Panel = require('../models/Panel');
 const { createApplicationPanel, createConsolidatedPanel } = require('../utils/embedUtils');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
+const { MessageFlags } = require('discord.js');
 
 // Store cooldowns for reload button
 const reloadCooldowns = new Map();
@@ -12,8 +13,27 @@ const reloadCooldowns = new Map();
  */
 async function syncAllPanels(client) {
     try {
-        const applications = await Application.find({ active: true });
-        const existingPanel = await Panel.findOne({});
+        console.log('Starting panel synchronization...');
+        
+        // Fetch active applications with error handling
+        let applications;
+        try {
+            applications = await Application.find({ active: true });
+            console.log(`Found ${applications.length} active applications`);
+        } catch (dbError) {
+            console.error('Database error when fetching applications:', dbError);
+            throw new Error(`Failed to fetch applications: ${dbError.message}`);
+        }
+        
+        // Check for existing panel with error handling
+        let existingPanel;
+        try {
+            existingPanel = await Panel.findOne({});
+        } catch (dbError) {
+            console.error('Database error when fetching existing panel:', dbError);
+            throw new Error(`Failed to fetch existing panel: ${dbError.message}`);
+        }
+        
         if ((!applications || applications.length === 0) && !existingPanel) {
             console.log('No applications or panels to sync. No panel will be shown.');
             return;
@@ -28,16 +48,26 @@ async function syncAllPanels(client) {
         
         // Get the first application to determine channel and guild
         const firstApp = applications[0];
+        if (!firstApp.guildId) {
+            console.error('First application has no guildId');
+            return;
+        }
+        
         const guild = client.guilds.cache.get(firstApp.guildId);
         if (!guild) {
-            console.log(`Guild ${firstApp.guildId} not found`);
+            console.error(`Guild ${firstApp.guildId} not found`);
             return;
         }
         
         // Get panel channel from the first application
+        if (!firstApp.channels || !firstApp.channels.panel) {
+            console.error('First application has no panel channel configured');
+            return;
+        }
+        
         const channel = guild.channels.cache.get(firstApp.channels.panel);
         if (!channel) {
-            console.log(`Panel channel ${firstApp.channels.panel} not found`);
+            console.error(`Panel channel ${firstApp.channels.panel} not found`);
             return;
         }
         
@@ -47,6 +77,8 @@ async function syncAllPanels(client) {
         console.log('Panel sync completed successfully');
     } catch (error) {
         console.error('Error in syncAllPanels:', error);
+        console.error('Stack trace:', error.stack);
+        // Rethrow the error to be handled by the caller
         throw error;
     }
 }
@@ -156,7 +188,7 @@ async function handleReloadButton(interaction) {
             const timeLeft = Math.ceil((cooldownTime - (Date.now() - lastReload)) / 1000 / 60);
             return interaction.reply({
                 content: `⏳ Please wait ${timeLeft} minute(s) before reloading again.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
         
@@ -174,7 +206,7 @@ async function handleReloadButton(interaction) {
         
         await interaction.reply({
             content: '✅ Panel has been reloaded!',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     } catch (error) {
         console.error('Error handling reload button:', error);
@@ -182,13 +214,13 @@ async function handleReloadButton(interaction) {
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({
                 content: '❌ An error occurred while reloading the panel.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             }).catch(err => console.error('Failed to send error reply for reload button:', err));
         } else if (interaction.replied) {
             // If already replied, use followUp instead
             await interaction.followUp({
                 content: '❌ An error occurred while reloading the panel.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             }).catch(err => console.error('Failed to follow up for reload button error:', err));
         }
     }

@@ -6,7 +6,8 @@ const {
   Collection,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  MessageFlags
 } = require("discord.js");
 const { createEmbed, createApplicationPanel, createSubmissionModal } = require("../utils/embedUtils");
 const Application = require("../models/Application");
@@ -28,7 +29,7 @@ selectHandlers.set("apply", async (interaction) => {
     if (!application) {
       return interaction.reply({
         content: "❌ This position is no longer available.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral
       });
     }
 

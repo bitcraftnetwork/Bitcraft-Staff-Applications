@@ -500,9 +500,27 @@ module.exports = {
       }
     } catch (error) {
       console.error("Error handling command:", error);
-      await message.reply(
-        "❌ An error occurred while processing your command."
-      );
+      
+      // Create a more detailed error message
+      let errorMessage = "❌ An error occurred while processing your command.";
+      
+      // Add more context in development environment
+      if (envConfig.NODE_ENV === 'development') {
+        errorMessage += `\n\nError details: ${error.message}`;
+      }
+      
+      // Log the full error stack in console
+      console.error("Command error stack:", error.stack);
+      
+      // Send error message and delete it after some time in non-development environments
+      const reply = await message.reply(errorMessage);
+      
+      // In production, delete the error message after 10 seconds to keep channels clean
+      if (envConfig.NODE_ENV === 'production') {
+        setTimeout(() => {
+          reply.delete().catch(e => console.error("Could not delete error message:", e));
+        }, 10000);
+      }
     }
   },
 };

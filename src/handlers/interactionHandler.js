@@ -6,6 +6,7 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  MessageFlags,
 } = require("discord.js");
 const {
   createEmbed,
@@ -518,14 +519,14 @@ class InteractionHandler {
       await interaction
         .followUp({
           content: errorMessage,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         })
         .catch(console.error);
     } else {
       await interaction
         .reply({
           content: errorMessage,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         })
         .catch(console.error);
     }

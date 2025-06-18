@@ -1,4 +1,4 @@
-const { Collection, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { Collection, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const { createEmbed, createApplicationModal, createPrefilledApplicationModal, createAllowResubmitModal, createResubmitDecisionEmbed, createAcceptanceEmbed } = require('../utils/embedUtils');
 const { isAdmin } = require('../utils/permissionUtils');
 const Application = require('../models/Application');
@@ -17,7 +17,7 @@ buttonHandlers.set('accept', async (interaction, submissionId) => {
         if (!submission) {
             return interaction.reply({
                 content: '❌ Application not found.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -25,7 +25,7 @@ buttonHandlers.set('accept', async (interaction, submissionId) => {
         if (!await isAdmin(interaction.member)) {
             return interaction.reply({
                 content: '❌ You do not have permission to accept applications.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 

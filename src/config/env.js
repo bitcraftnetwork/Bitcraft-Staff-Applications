@@ -1,6 +1,7 @@
 /**
  * Environment configuration loader
  * Loads different .env files based on the current npm script
+ * Validates required environment variables
  */
 
 const dotenv = require('dotenv');
@@ -44,6 +45,20 @@ if (!fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
 
+// Validate required environment variables
+const requiredEnvVars = ['DISCORD_TOKEN', 'MONGO_URI'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error(`❌ Error: Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  console.error(`Please check your ${envFile} file and ensure all required variables are set.`);
+  
+  // Exit with error code if in production, otherwise just warn
+  if (npmScript !== 'dev' && npmScript !== 'test') {
+    process.exit(1);
+  }
+}
+
 module.exports = {
   // Export environment variables that might be needed elsewhere
   NODE_ENV: process.env.NODE_ENV || (npmScript === 'test' ? 'test' : npmScript === 'dev' ? 'development' : 'production'),
@@ -51,4 +66,7 @@ module.exports = {
   COMMAND_PREFIX: process.env.COMMAND_PREFIX || commandPrefix, // Export the command prefix
   ENV_FILE: envFile, // Export the environment file name
   // Add other commonly used environment variables here
+  DISCORD_TOKEN: process.env.DISCORD_TOKEN,
+  GUILD_ID: process.env.GUILD_ID || null,
+  CLIENT_ID: process.env.CLIENT_ID || null,
 };
