@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 
-x// Log the current environment
+// Log the current environment
 console.log(`🌍 Current environment: ${envConfig.NODE_ENV}`);
 console.log(`📄 Environment file: ${envConfig.ENV_FILE}`);
 console.log(`🔧 Command prefix: ${envConfig.COMMAND_PREFIX}`);
